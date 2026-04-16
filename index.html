@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Particles</title>
+  <style>
+    html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #f8f8f8; }
+    canvas { display: block; width: 100vw; height: 100vh; }
+
+    .center {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      pointer-events: none;
+    }
+
+    @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@200;300&display=swap');
+
+    .btn-click {
+      pointer-events: all;
+      font-family: 'Manrope', -apple-system, sans-serif;
+      font-size: 18px;
+      font-weight: 200;
+      letter-spacing: 8px;
+      text-transform: uppercase;
+      color: #1a1a1a;
+      text-decoration: none;
+      padding: 20px 60px;
+      border: 1px solid rgba(0,0,0,0.18);
+      border-radius: 100px;
+      background: rgba(255,255,255,0.22);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      transition: background 0.25s, transform 0.2s, letter-spacing 0.25s;
+    }
+
+    .btn-click:hover {
+      background: rgba(255,255,255,0.42);
+      transform: scale(1.05);
+      letter-spacing: 12px;
+    }
+  </style>
+</head>
+<body>
+<canvas id="canvas"></canvas>
+
+<div class="center">
+  <a href="effects/" class="btn-click">Click</a>
+</div>
+<script>
+  const canvas = document.getElementById("canvas");
+  const ctx    = canvas.getContext("2d");
+
+  let W = canvas.width  = window.innerWidth;
+  let H = canvas.height = window.innerHeight;
+
+  const N   = 30000;
+  const px  = new Float32Array(N);   // текущая x
+  const py  = new Float32Array(N);   // текущая y
+  const pvx = new Float32Array(N);   // скорость x
+  const pvy = new Float32Array(N);   // скорость y
+  const phx = new Float32Array(N);   // домашняя x (куда вернуться)
+  const phy = new Float32Array(N);   // домашняя y
+
+  // Мышь
+  let mx = -9999, my = -9999, mActive = false;
+
+  window.addEventListener("mousemove", e => { mx = e.clientX; my = e.clientY; mActive = true; });
+  window.addEventListener("mouseleave", () => { mActive = false; });
+  window.addEventListener("touchmove", e => {
+    e.preventDefault();
+    mx = e.touches[0].clientX; my = e.touches[0].clientY; mActive = true;
+  }, { passive: false });
+  window.addEventListener("touchend", () => { mActive = false; });
+  window.addEventListener("resize", () => {
+    W = canvas.width  = window.innerWidth;
+    H = canvas.height = window.innerHeight;
+    init();
+  });
+
+  function init() {
+    for (let i = 0; i < N; i++) {
+      phx[i] = Math.random() * W;
+      phy[i] = Math.random() * H;
+      px[i]  = phx[i];
+      py[i]  = phy[i];
+      pvx[i] = 0;
+      pvy[i] = 0;
+    }
+  }
+
+  // ── Физика ──────────────────────────────────────────────────────────────────
+  const REPEL_R  = 90;
+  const REPEL_R2 = REPEL_R * REPEL_R;
+  const REPEL_F  = 5;     // сила отталкивания — не слишком сильная
+  const SPRING   = 0.018; // слабая пружина — нет перелёта
+  const DAMP     = 0.96;  // высокое затухание — нет осцилляции
+  const MAX_V    = 10;    // ограничение скорости
+
+  function animate() {
+    requestAnimationFrame(animate);
+    ctx.clearRect(0, 0, W, H);
+    ctx.fillStyle = "rgba(20,20,20,0.85)";
+
+    for (let i = 0; i < N; i++) {
+      // 1. Мышка отталкивает
+      if (mActive) {
+        const dx = px[i] - mx;
+        const dy = py[i] - my;
+        const d2 = dx * dx + dy * dy;
+        if (d2 < REPEL_R2 && d2 > 0.5) {
+          const d  = Math.sqrt(d2);
+          const t  = 1 - d / REPEL_R;     // 0..1 — сильнее у центра
+          const f  = t * t * REPEL_F;
+          pvx[i] += (dx / d) * f;         // вектор ОТ мышки
+          pvy[i] += (dy / d) * f;
+        }
+      }
+
+      // 2. Пружина тянет домой — слабо, без перелёта
+      pvx[i] += (phx[i] - px[i]) * SPRING;
+      pvy[i] += (phy[i] - py[i]) * SPRING;
+
+      // 3. Затухание — гасит скорость, нет осцилляции
+      pvx[i] *= DAMP;
+      pvy[i] *= DAMP;
+
+      // 4. Ограничение скорости — частицы не улетают
+      const spd = pvx[i] * pvx[i] + pvy[i] * pvy[i];
+      if (spd > MAX_V * MAX_V) {
+        const s  = MAX_V / Math.sqrt(spd);
+        pvx[i] *= s;
+        pvy[i] *= s;
+      }
+
+      // 5. Позиция
+      px[i] += pvx[i];
+      py[i] += pvy[i];
+
+      // 6. Рисуем точку
+      ctx.fillRect(px[i] | 0, py[i] | 0, 1, 1);
+    }
+  }
+
+  init();
+  animate();
+</script>
+</body>
+</html>
